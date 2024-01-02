@@ -18,7 +18,7 @@ wss.on('connection', function connection(ws) {
 		console.log('kfsock connect event');
 	});
 
-  kfsock.on('permissions', function(perms) {
+	kfsock.on('permissions', function(perms) {
 		if(!authed) {
 			ws.send(JSON.stringify({
 				type: 'core.AuthenticatedEvent',
@@ -39,8 +39,8 @@ wss.on('connection', function connection(ws) {
 				},
 			},
 		}));
-  });
-  kfsock.on('preferences', function(prefs) {
+	});
+	kfsock.on('preferences', function(prefs) {
 		ws.send(JSON.stringify({
 			type: 'remote.PreferencesUpdateEvent',
 			payload: {
@@ -51,8 +51,8 @@ wss.on('connection', function connection(ws) {
 				},
 			},
 		}));
-  });
-  kfsock.on('status', function(status) {
+	});
+	kfsock.on('status', function(status) {
 		const tracks = [];
 		if('volumeBv' in status) {
 			tracks.push({
@@ -78,8 +78,8 @@ wss.on('connection', function connection(ws) {
 				},
 			},
 		}));
-  });
-  kfsock.on('queue', function(queue) {
+	});
+	kfsock.on('queue', function(queue) {
 		const items = [];
 		for(const s of queue) {
 			// TODO: s.singer
@@ -105,16 +105,16 @@ wss.on('connection', function connection(ws) {
 				},
 			},
 		}));
-  });
+	});
 
-  kfsock.on('serverUnreacheable', function() {
-    console.log('received serverUnreacheable from kf');
+	kfsock.on('serverUnreacheable', function() {
+		console.log('received serverUnreacheable from kf');
 		ws.emit('serverUnreacheable');
-  });
+	});
 
-  ws.on('message', function(data) {
-    console.log('received: %s', data);
-  });
+	ws.on('message', function(data) {
+		console.log('received: %s', data);
+	});
 
 	kfsock.emit("authenticate", {"login":"proxy","channel":"347021","role":"participant","app":"karafun","socket_id":null});
 });
