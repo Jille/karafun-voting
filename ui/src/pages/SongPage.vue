@@ -2,18 +2,24 @@
 	<q-spinner v-if="loading" />
   <q-page v-else class="row items-center justify-evenly">
 		<img :src="song.img" />
-    <h1>{{song.artist.name}} - {{song.name}}</h1>
-		<div class="subcaption">{{song.rights}}<br>Year {{song.year}}</div>
-		{{duration}}
-		<ul>
-			<li v-for="st in song.styles" :key="st.id"><router-link :to="'/songs/st_' + st.id">{{st.name}}</router-link></li>
-		</ul>
+    <div class="text-h5">{{song.artist.name}} - {{song.name}}</div>
+    <div>
+      <q-chip color="secondary" icon="calendar_month">{{song.year}}</q-chip>
+      <q-chip color="secondary" icon="timer">{{duration}}</q-chip>
+    </div>
+    <div class="row items-center justify-evenly">
+      <q-chip v-for="st in song.styles" :key="st.id" dense clickable @click="$router.push({name: 'songs', params: {filter: 'st_' + st.id}})">
+       {{st.name}}
+     </q-chip>
+    </div>
 		<q-btn label="Lyrics" @click="showLyrics = true" />
 
 		<div v-if="false">
 			<h2>Other songs from {{song.artist.name}}</h2>
 			<SongsList :filter="'ar_' + song.artist.id +'_'+ song.id" />
 		</div>
+
+    <q-btn label="Add to queue" @click="add" v-if="permissions.addToQueue" />
 
 		<q-dialog v-model="showLyrics">
 			<q-card class="q-px-xl">
@@ -26,7 +32,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, inject } from 'vue';
 import SongsList from '../components/SongsList.vue';
 
 export default defineComponent({
@@ -43,8 +49,13 @@ export default defineComponent({
 			song: {duration: 0},
 			loading: true,
 			showLyrics: false,
+			websocket: inject('websocket') as null|WebSocket,
 		};
 	},
+	inject: [
+	  'username',
+	  'permissions'
+	],
 	computed: {
 		duration() {
 			let secs = this.song.duration % 60 as string | number;
@@ -58,12 +69,22 @@ export default defineComponent({
 		id: {
 			async handler(id: string) {
 				this.loading = true;
-				const resp = await this.$axios.get('https://www.karafun.co.uk/347021?type=song_info&id='+ id);
+				const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '?type=song_info&id='+ id);
 				this.song = resp.data;
 				this.loading = false;
 			},
 			immediate: true,
 		},
+	},
+	methods: {
+	  add() {
+	    const cmd = {
+	      command: 'enqueue',
+	      song_id: +this.id,
+	      username: this.username,
+	    }
+	    this.websocket && this.websocket.send(JSON.stringify(cmd))
+	  }
 	},
 });
 </script>

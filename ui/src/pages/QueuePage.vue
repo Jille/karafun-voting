@@ -14,14 +14,5 @@ export default defineComponent({
 			loading: true,
 		};
 	},
-	mounted() {
-		const socket = new WebSocket('ws://' + window.location.hostname +':8067/ws');
-		socket.addEventListener('open', function() {
-			socket.send('{"command": "hello"}');
-		});
-		socket.addEventListener('message', (event) => {
-			console.log('Message from server ', event.data);
-		});
-	},
 });
 </script>

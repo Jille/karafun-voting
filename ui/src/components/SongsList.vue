@@ -1,10 +1,16 @@
 <template>
-	<q-list>
-		<q-item v-for="s in songs" :key="s.id" :to="'/song/' + s.id">
-			<q-item-section avatar><img :src="s.img" /></q-item-section>
-			<q-item-section>{{s.artist.name}} - {{s.name}}</q-item-section>
-		</q-item>
-	</q-list>
+  <div class="q-col-gutter-md row items-start">
+		<div v-for="s in songs" :key="s.id" class="col-6">
+		  <router-link :to="{name: 'song', params: {id: s.id}}">
+        <q-img :src="s.img">
+          <div class="absolute-bottom text-subtitle1 text-center">
+            <div>{{s.artist.name}}</div>
+            <div>{{s.name}}</div>
+          </div>
+        </q-img>
+      </router-link>
+		</div>
+	</div>
 </template>
 
 <script lang="ts">
@@ -27,7 +33,7 @@ export default defineComponent({
 	watch: {
 		filter: {
 			async handler(f: string) {
-				const resp = await this.$axios.get('https://www.karafun.co.uk/347021?type=song_list&filter='+ f + '&offset=0');
+				const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '?type=song_list&filter='+ f + '&offset=0');
 				this.songs = resp.data.songs;
 				this.total = resp.data.total;
 			},

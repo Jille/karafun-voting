@@ -1,10 +1,10 @@
 <template>
   <q-page class="row items-center justify-evenly">
 		<q-tabs class="col-12" active-color="primary">
-			<q-route-tab to="/theme" exact label="Playlists" />
-			<q-route-tab to="/styles" exact label="Genres" />
-			<q-route-tab to="/top" exact label="Top" />
-			<q-route-tab to="/news" exact label="New releases" />
+			<q-route-tab :to="{name: 'list', params: {list: 'theme'}}" exact label="Playlists" />
+			<q-route-tab :to="{name: 'list', params: {list: 'styles'}}" exact label="Genres" />
+			<q-route-tab :to="{name: 'list', params: {list: 'top'}}" exact label="Top" />
+			<q-route-tab :to="{name: 'list', params: {list: 'news'}}" exact label="New releases" />
 		</q-tabs>
     <CategoryList :list="list" />
   </q-page>

@@ -1,8 +1,8 @@
 <template>
-	<div class="row q-gutter-md q-pa-md">
-		<div class="col-1" v-for="c in categories" :key="c.img">
-			<router-link :to="songsLink(c.id)">
-				<img :src="c.img" :title="c.name" width="100" height="100" />
+	<div class="row q-gutter-sm q-pa-sm">
+		<div class="col-2 thumbnail" v-for="c in categories" :key="c.img">
+			<router-link :to="{name:'songs', params: {filter: (list=='styles' ? 'st' : 'pl') + '_' + c.id}}">
+				<q-img :src="c.img" :title="c.name" fit="scale-down" />
 			</router-link>
 		</div>
 	</div>
@@ -24,20 +24,10 @@ export default defineComponent({
 			categories: [],
 		};
 	},
-	methods: {
-		songsLink(id: number): string {
-			if(this.list == 'styles') {
-				return '/songs/st_' + id;
-			}
-			return '/songs/pl_' + id;
-		},
-	},
 	watch: {
 		list: {
 			async handler(list: string) {
-				const resp = await this.$axios.get('https://www.karafun.co.uk/347021?type='+ list);
-				console.log(resp);
-				console.log(resp.request.responseURL);
+				const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '?type='+ list);
 				if(resp.request.responseURL.match(/remote-error/)) {
 					return;
 				}
