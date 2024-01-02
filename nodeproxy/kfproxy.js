@@ -3,14 +3,15 @@ import io from "socket.io-client";
 
 const wss = new WebSocketServer({ port: 8067 });
 
-wss.on('connection', function connection(ws) {
+wss.on('connection', function connection(ws, request) {
+	const channel = request.headers['x-karafun-channel'];
 	let authed = false;
 
 	const kfsock = io("wss://www.karafun.co.uk/", {
 		reconnectionDelayMax: 10000,
 		transports: ["websocket"],
 		query: {
-			"remote": "kf347021"
+			"remote": "kf" + channel,
 		}
 	});
 
@@ -71,7 +72,7 @@ wss.on('connection', function connection(ws) {
 			type: 'remote.StatusEvent',
 			payload: {
 				status: {
-					state: 3,
+					state: status['state'] == 'playing' ? 4 : status['state'] == 'paused' ? 5 : 3,
 					tempo: status['tempo'],
 					pitch: status['pitch'],
 					tracks: tracks,
@@ -82,10 +83,10 @@ wss.on('connection', function connection(ws) {
 	kfsock.on('queue', function(queue) {
 		const items = [];
 		for(const s of queue) {
-			// TODO: s.singer
 			// TODO: s.status (lege string?)
 			items.push({
 				id: ''+s['id'],
+				singer: s['singer'] ?? '',
 				song: {
 					id: {
 						type: 1,
@@ -109,12 +110,60 @@ wss.on('connection', function connection(ws) {
 
 	kfsock.on('serverUnreacheable', function() {
 		console.log('received serverUnreacheable from kf');
-		ws.emit('serverUnreacheable');
+		ws.send(JSON.stringify({
+			type: 'ServerUnreachable',
+			payload: {},
+		}));
 	});
 
-	ws.on('message', function(data) {
-		console.log('received: %s', data);
+	ws.on('message', function(raw) {
+		console.log('received: %s', raw);
+		const data = JSON.parse(raw);
+		switch(data.type) {
+			case 'remote.AddToQueueResponse':
+				kfsock.emit("queueAdd", {"songId": +data.payload.identifier.id, "pos": +data.payload.position, "singer": data.payload.singer ?? ''});
+				break;
+			case 'remote.MoveInQueueRequest':
+				kfsock.emit("queueMove", {"queueId": +data.payload.queueItemId, "from": +data.payload.queueItemId, "to": +data.payload.to});
+				break;
+			case 'remote.RemoveFromQueueRequest':
+				kfsock.emit("queueRemove", +data.payload.queueItemId);
+				break;
+			case 'remote.PlayRequest':
+				kfsock.emit("play", null);
+				break;
+			case 'remote.PauseRequest':
+				kfsock.emit("pause", null);
+				break;
+			case 'remote.NextRequest':
+				kfsock.emit("next", null);
+				break;
+			case 'remote.TrackVolumeRequest':
+				if(data.payload.type == 4) {
+					kfsock.emit("volumeBv", data.payload.volume);
+				} else {
+					console.log("Changing the volume for type != 4 is not yet implemented")
+				}
+				break;
+			case 'remote.PitchRequest':
+				kfsock.emit("pitch", data.payload.pitch);
+				break;
+			case 'remote.TempoRequest':
+				kfsock.emit("tempo", data.payload.tempo);
+				break;
+			default:
+				console.log("Ignoring unknown command ", data.type)
+		}
 	});
 
-	kfsock.emit("authenticate", {"login":"proxy","channel":"347021","role":"participant","app":"karafun","socket_id":null});
+	ws.on('close', function() {
+		console.log('Client disconnected, closing connection to karafun');
+		kfsock.disconnect()
+	});
+
+	kfsock.on('loginAlreadyTaken', function() {
+		kfsock.emit("authenticate", {"login":"proxy " + Math.random(),"channel":channel,"role":"participant","app":"karafun","socket_id":null});
+	});
+
+	kfsock.emit("authenticate", {"login":"proxy","channel":channel,"role":"participant","app":"karafun","socket_id":null});
 });

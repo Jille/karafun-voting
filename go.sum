@@ -1,0 +1,10 @@
+github.com/Jille/contextcond v1.0.0 h1:MI7hdTKyS6CLc5DIJmyjN8iEfw7/e8HJ5ZOwTJpS9SI=
+github.com/Jille/contextcond v1.0.0/go.mod h1:aWoovvPMcWinBsm69wTnhSrCwTGtCfg4xr4Nku8WgIg=
+github.com/Jille/genericz v0.4.0 h1:ppnZsT9Uu866k9Sa9mlsZV6Z2Nyy/7zVmEc3mUlnTbE=
+github.com/Jille/genericz v0.4.0/go.mod h1:J9GF608ey+8AmME0HFGGFuD5f+2TRHbOfcmaF8dIIXI=
+github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/QY=
+github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
+golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 h1:MGwJjxBy0HJshjDNfLsYO8xppfqWlA5ZT9OhtUUhTNw=
+golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1/go.mod h1:FXUEEKJgO7OQYeo8N01OfiKP8RXMtf6e8aTskBGqWdc=
+golang.org/x/net v0.17.0 h1:pVaXccu2ozPjCXewfr1S7xza/zcXTity9cCdXQYSjIM=
+golang.org/x/net v0.17.0/go.mod h1:NxSsAGuq816PNPmqtQdLE42eU2Fs7NoRIZrHJAlaCOE=
