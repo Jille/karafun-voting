@@ -1,5 +1,5 @@
 <template>
-	<div class="row q-gutter-sm q-pa-sm">
+	<div class="row q-gutter-md justify-center">
 		<div class="col-2 thumbnail" v-for="c in categories" :key="c.img">
 			<router-link :to="{name:'songs', params: {filter: (list=='styles' ? 'st' : 'pl') + '_' + c.id}}">
 				<q-img :src="c.img" :title="c.name" fit="scale-down" />

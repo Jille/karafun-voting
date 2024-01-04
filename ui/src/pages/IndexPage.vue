@@ -1,6 +1,6 @@
 <template>
-  <q-page class="row items-center justify-evenly">
-		<q-tabs class="col-12" active-color="primary">
+  <q-page>
+		<q-tabs class="q-mb-md" active-color="primary">
 			<q-route-tab :to="{name: 'list', params: {list: 'theme'}}" exact label="Playlists" />
 			<q-route-tab :to="{name: 'list', params: {list: 'styles'}}" exact label="Genres" />
 			<q-route-tab :to="{name: 'list', params: {list: 'top'}}" exact label="Top" />

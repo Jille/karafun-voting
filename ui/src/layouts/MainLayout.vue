@@ -2,16 +2,16 @@
   <q-layout view="lHh Lpr lFf">
     <q-header elevated>
       <q-toolbar>
-        <q-toolbar-title class="row justify-between">
+        <q-toolbar-title class="row justify-between items-center">
 					<template v-if="!searching">
-						<router-link class="text-white" :to="{name: 'home'}">Karafun</router-link>
+						<router-link class="text-white" :to="{name: 'list', params: {list: 'theme'}}">Karafun</router-link>
 						<q-space />
 						<q-btn icon="search" @click="searching = true" round flat />
   				  <q-btn icon="person" round flat @click="askUsername=true" />
 					</template>
 					<template v-else>
 						<q-btn icon="chevron_left" @click="searching = false" round flat />
-						<q-input v-model="search" debounce="300" clearable color="white" dense class="col-grow" />
+						<q-input v-model="search" debounce="300" clearable color="white" dense autofocus class="col-grow" />
 					</template>
         </q-toolbar-title>
       </q-toolbar>
@@ -173,7 +173,7 @@ export default defineComponent({
     },
     connect() {
       this.connected = false
-      this.connection = new WebSocket('ws://stam.skynet.quis.cx:8066/ws');
+      this.connection = new WebSocket('ws://localhost:8066/ws');
       this.connection.onopen = () => {
         this.connection && this.connection.send(this.$route.params.channel as string);
         this.connected = true

@@ -1,16 +1,14 @@
 <template>
-  <div class="q-col-gutter-md row items-start">
-		<div v-for="s in songs" :key="s.id" class="col-6">
-		  <router-link :to="{name: 'song', params: {id: s.id}}">
-        <q-img :src="s.img">
-          <div class="absolute-bottom text-subtitle1 text-center">
-            <div>{{s.artist.name}}</div>
-            <div>{{s.name}}</div>
-          </div>
-        </q-img>
-      </router-link>
-		</div>
-	</div>
+	<q-list class="full-width">
+		<q-item v-for="s in songs" :key="s.id" :to="{name: 'song', params: {id: s.id}}">
+			<q-item-section avatar><img :src="s.img" height="70px" /></q-item-section>
+			<q-item-section>
+				<div class="text-bold">{{s.name}}</div>
+				<div>{{s.artist.name}}</div>
+			</q-item-section>
+		</q-item>
+	</q-list>
+	<q-btn label="Load more" @click="loadMore" :loading="loading" v-if="songs.length < total" class="q-mb-md" />
 </template>
 
 <script lang="ts">
@@ -26,9 +24,19 @@ export default defineComponent({
 	},
 	data() {
 		return {
-			songs: [],
+			songs: [] as {id: number; name: string; img: string}[],
 			total: 0,
+			loading: false,
 		};
+	},
+	methods: {
+		async loadMore() {
+			this.loading = true;
+			const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '?type=song_list&filter='+ this.filter + '&offset='+this.songs.length);
+			this.songs.push(...resp.data.songs);
+			this.total = resp.data.total;
+			this.loading = false;
+		},
 	},
 	watch: {
 		filter: {
