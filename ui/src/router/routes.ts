@@ -3,7 +3,6 @@ import { RouteRecordRaw } from 'vue-router';
 const routes: RouteRecordRaw[] = [
   {
     path: '/:channel([0-9]{6})/',
-    props: true,
     component: () => import('layouts/MainLayout.vue'),
     children: [
 			{ name: 'home', path: '', component: () => import('pages/IndexPage.vue'), props: { list: 'theme'} },
