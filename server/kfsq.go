@@ -265,7 +265,7 @@ func (s *karaokeSession) listen() {
 		case "remote.StatusEvent":
 			var tracks []Track
 			for _, t := range km.Payload.Status.Tracks {
-				if t.Track.Caption == "" {
+				if len(t.Track.Caption) < 3 {
 					switch t.Track.Type {
 					case 1:
 						t.Track.Caption = "General volume"
