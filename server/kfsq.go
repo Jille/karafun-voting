@@ -266,7 +266,14 @@ func (s *karaokeSession) listen() {
 			var tracks []Track
 			for _, t := range km.Payload.Status.Tracks {
 				if t.Track.Caption == "" {
-					t.Track.Caption = "Audio"
+					switch t.Track.Type {
+					case 1:
+						t.Track.Caption = "General volume"
+					case 4:
+						t.Track.Caption = "Vocals"
+					default:
+						t.Track.Caption = "Audio"
+					}
 				}
 				tracks = append(tracks, Track{
 					TrackID: t.Track.Type,

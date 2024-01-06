@@ -56,6 +56,12 @@ wss.on('connection', function connection(ws, request) {
 	});
 	kfsock.on('status', function(status) {
 		const tracks = [];
+		if('volume' in status) {
+			tracks.push({
+				track: {type: 1},
+				volume: status['volume'],
+			});
+		}
 		if('volumeBv' in status) {
 			tracks.push({
 				track: {type: 4},
@@ -167,7 +173,9 @@ wss.on('connection', function connection(ws, request) {
 				kfsock.emit("next", null);
 				break;
 			case 'remote.TrackVolumeRequest':
-				if(data.payload.type == 4) {
+				if(data.payload.type == 1) {
+					kfsock.emit("volume", data.payload.volume);
+				} else if(data.payload.type == 4) {
 					kfsock.emit("volumeBv", data.payload.volume);
 				} else {
 					for(const [name, id] of Object.entries(audioTracks)) {
