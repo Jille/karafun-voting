@@ -52,16 +52,16 @@
                     <q-item-section side>
                       <div class="q-gutter-sm" v-if="this.$q.screen.gt.sm">
                         <q-btn icon="delete" dense color="red" @click="remove(q.my_queue_id)" />
-                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
-                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
+                        <q-btn v-if="q.singers.includes(username) && (q.can_move_up || q.can_move_down)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
+                        <q-btn v-if="q.singers.includes(username) && (q.can_move_up || q.can_move_down)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
                         <q-btn v-if="!q.singers.includes(this.username)" icon="thumb_up" dense color="green" @click="upvote(q.my_queue_id)" />
                       </div>
                       <div v-else class="q-gutter-xs">
                         <q-btn icon="delete" dense color="red" @click="remove(q.my_queue_id)" />
                         <q-btn v-if="!q.singers.includes(this.username)" icon="thumb_up" dense color="green" @click="upvote(q.my_queue_id)" />
                         <br />
-                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
-                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
+                        <q-btn v-if="q.singers.includes(username) && (q.can_move_up || q.can_move_down)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
+                        <q-btn v-if="q.singers.includes(username) && (q.can_move_up || q.can_move_down)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
                       </div>
                     </q-item-section>
                   </q-item>
