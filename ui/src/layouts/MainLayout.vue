@@ -77,7 +77,7 @@
                 <div v-for="(t, idx) in status.tracks" :key="t.track_id">
                   <q-badge color="secondary">{{t.caption}}
                   </q-badge>
-                  <q-slider v-model="t.volume" :min="0" :max="100" :step="1" v-if="permissions.manageVolumes" @update:model-value="setVolume(idx)"/>
+                  <q-slider v-model="t.volume" :min="0" :max="100" :step="1" :debounce="300" v-if="permissions.manageVolumes" @update:model-value="setVolume(idx)"/>
                 </div>
               </div>
             </q-card-section>
