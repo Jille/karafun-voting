@@ -473,6 +473,9 @@ func (s *karaokeSession) queueSyncer() {
 		}
 		select {
 		case kfQueue = <-s.queueSyncCh:
+			s.mtx.Lock()
+			s.reorder()
+			s.mtx.Unlock()
 		case <-queueChangedCh:
 		}
 	}
@@ -581,6 +584,16 @@ func (s *karaokeSession) reorder() {
 	rrIdx := 0
 	moved := make([]bool, len(s.Queue))
 	newQueue := make([]QueueSong, 0, len(s.Queue))
+	for i, qe := range s.Queue {
+		if qe.MinSingers <= len(qe.Singers) {
+			newQueue = append(newQueue, qe)
+			moved[i] = true
+			for _, name := range qe.Singers {
+				happiness[slices.Index(singerRoundRobin, name)] += 1 / float64(len(qe.Singers))
+			}
+			break
+		}
+	}
 	for len(newQueue) < len(s.Queue) {
 		lowestHappiness := genericz.Min(happiness...)
 		for happiness[rrIdx] > lowestHappiness {
@@ -603,6 +616,13 @@ func (s *karaokeSession) reorder() {
 			happiness[rrIdx] += 1000
 		}
 		rrIdx = (rrIdx + 1) % len(singerRoundRobin)
+	}
+	for i := 0; len(newQueue) > i; i++ {
+		if s.Queue[i].MyQueueID != newQueue[i].MyQueueID {
+			s.QueueVersion++
+			s.cond.Broadcast()
+			break
+		}
 	}
 	s.Queue = newQueue
 	s.determineMoveability()
