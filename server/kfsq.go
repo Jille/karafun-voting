@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -15,10 +19,14 @@ import (
 	"github.com/Jille/contextcond"
 	"github.com/Jille/genericz"
 	"github.com/Jille/genericz/mapz"
+	"github.com/Jille/genericz/slicez"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 )
 
 var (
+	datadir = flag.String("datadir", "", "Path to session persistence")
+
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -30,6 +38,7 @@ var (
 )
 
 func main() {
+	flag.Parse()
 	http.HandleFunc("/ws", handleWS)
 	log.Fatal(http.ListenAndServe(":8066", nil))
 }
@@ -46,6 +55,7 @@ type karaokeSession struct {
 	QueueVersion       int
 	PermissionsVersion int
 	SessionError       string
+	singerRoundRobin   []string
 
 	queueSyncCh chan []KarafunQueueEntry
 
@@ -162,8 +172,7 @@ func (s *karaokeSession) websockWriter(ctx context.Context, conn *websocket.Conn
 		}
 		u := Update{}
 		if statusVersion != s.StatusVersion {
-			c := s.Status
-			u.Status = &c
+			u.Status = &s.Status
 			statusVersion = s.StatusVersion
 		}
 		if queueVersion != s.QueueVersion {
@@ -175,8 +184,7 @@ func (s *karaokeSession) websockWriter(ctx context.Context, conn *websocket.Conn
 			queueVersion = s.QueueVersion
 		}
 		if permissionsVersion != s.PermissionsVersion {
-			p := s.Permissions
-			u.Permissions = &p
+			u.Permissions = &s.Permissions
 			permissionsVersion = s.PermissionsVersion
 		}
 		j, err := json.Marshal(u)
@@ -196,7 +204,20 @@ func (s *karaokeSession) websockWriter(ctx context.Context, conn *websocket.Conn
 
 func (s *karaokeSession) init() {
 	defer s.mtx.Unlock()
-	// 1. Fetch the new webkcs url from their remote page
+	if *datadir != "" {
+		b, err := ioutil.ReadFile(filepath.Join(*datadir, s.channel+".json"))
+		if os.IsNotExist(err) {
+			b = []byte("null")
+			err = nil
+		}
+		if err != nil {
+			log.Printf("Can't recover session %s: %v", s.channel, err)
+		}
+		if err := json.Unmarshal(b, &s.Queue); err != nil {
+			panic(fmt.Errorf("failed to recover session %s: %v", s.channel, err))
+		}
+	}
+	// TODO: Fetch the new webkcs url from their remote page
 	h := http.Header{}
 	h.Set("X-Karafun-Channel", s.channel)
 	conn, _, err := dialer.Dial("ws://localhost:8067/", h)
@@ -254,6 +275,12 @@ func (s *karaokeSession) listen() {
 					Color:   fmt.Sprintf("%02x%02x%02x", t.Track.Color.Red, t.Track.Color.Green, t.Track.Color.Blue),
 				})
 			}
+			slices.SortFunc(tracks, func(a, b Track) int {
+				if a.TrackID < b.TrackID {
+					return -1
+				}
+				return 1
+			})
 			s.mtx.Lock()
 			s.Status = Status{
 				Playing: km.Payload.Status.State == 4,
@@ -293,8 +320,10 @@ func (s *karaokeSession) enqueue(songID int, singer string, minSingers int) {
 		Singers:    []string{singer},
 		MinSingers: minSingers,
 		SongID:     songID,
-		MyQueueID:  int(rand.Int63()),
+		MyQueueID:  int(rand.Int63n(9007199254740991)),
 	})
+	s.reorder()
+	s.persistToDisk()
 	s.QueueVersion++
 	s.mtx.Unlock()
 	s.cond.Broadcast()
@@ -304,9 +333,15 @@ func (s *karaokeSession) upvote(myQueueID int, singer string) {
 	s.mtx.Lock()
 	for i, qe := range s.Queue {
 		if qe.MyQueueID == myQueueID && !slices.Contains(qe.Singers, singer) {
-			s.Queue[i].Singers = append(qe.Singers, singer)
+			if j := slices.Index(qe.Singers, "adopted"); j != -1 {
+				qe.Singers[j] = singer
+			} else {
+				s.Queue[i].Singers = append(qe.Singers, singer)
+			}
 		}
 	}
+	s.reorder()
+	s.persistToDisk()
 	s.QueueVersion++
 	s.mtx.Unlock()
 	s.cond.Broadcast()
@@ -321,6 +356,37 @@ func (s *karaokeSession) remove(myQueueID int) {
 			break
 		}
 	}
+	s.reorder()
+	s.persistToDisk()
+	s.QueueVersion++
+	s.mtx.Unlock()
+	s.cond.Broadcast()
+}
+
+func (s *karaokeSession) moveUpDown(myQueueID int, up bool) {
+	s.mtx.Lock()
+	for i, qe := range s.Queue {
+		if qe.MyQueueID != myQueueID {
+			continue
+		}
+		if up {
+			for j, qe2 := range s.Queue[:i] {
+				if setEquals(qe.Singers, qe2.Singers) {
+					s.Queue[i], s.Queue[j] = s.Queue[j], s.Queue[i]
+					break
+				}
+			}
+		} else {
+			for j, qe2 := range s.Queue[i+1:] {
+				if setEquals(qe.Singers, qe2.Singers) {
+					s.Queue[i], s.Queue[i+1+j] = s.Queue[i+1+j], s.Queue[i]
+					break
+				}
+			}
+		}
+	}
+	s.reorder()
+	s.persistToDisk()
 	s.QueueVersion++
 	s.mtx.Unlock()
 	s.cond.Broadcast()
@@ -357,15 +423,6 @@ func (s *karaokeSession) changeTempo(val int) {
 	})
 }
 
-func (s *karaokeSession) moveUpDown(myQueueID int, up bool) {
-	/*
-		s.sendCommand("remote.MoveInQueueResponse", map[string]any{
-			"queueItemId": XXX,
-			"to": XXX,
-		})
-	*/
-}
-
 func (s *karaokeSession) queueSyncer() {
 	queueChangedCh := make(chan struct{}, 1)
 	go func() {
@@ -388,11 +445,11 @@ func (s *karaokeSession) queueSyncer() {
 	if s.Queue == nil {
 		for _, qe := range kfQueue {
 			s.Queue = append(s.Queue, QueueSong{
-				Artist:    qe.Song.Artist,
-				Song:      qe.Song.Title,
-				Singers:   []string{"adopted"},
-				KfQueueID: qe.ID,
-				MyQueueID: int(rand.Int63()),
+				Artist:        qe.Song.Artist,
+				Song:          qe.Song.Title,
+				Singers:       []string{"adopted"},
+				HasBeenQueued: true,
+				MyQueueID:     int(rand.Int63n(9007199254740991)),
 			})
 		}
 	}
@@ -426,22 +483,38 @@ func (s *karaokeSession) reconcile(kfQueue []KarafunQueueEntry) (string, map[str
 					s.Queue[i].Song = kfqe.Song.Title
 					log.Printf("Matched to song %#v", s.Queue[i])
 					s.QueueVersion++
+					s.cond.Broadcast()
 				}
 			}
 			return "remote.RemoveFromQueueRequest", map[string]any{
-				"queueItemId": fmt.Sprint(kfqe.ID),
+				"queueItemId": kfqe.ID,
 			}, true
 		}
 	}
-	queued := map[string]struct{}{}
-	for _, kfqe := range kfQueue {
-		k := kfqe.Song.Artist + "\x00" + kfqe.Song.Title
-		queued[k] = struct{}{}
+
+	inKfQueue := map[string][]idAndIndex{}
+	for i, kfqe := range kfQueue {
+		inKfQueue[kfqe.ArtistSong()] = append(inKfQueue[kfqe.ArtistSong()], idAndIndex{i, kfqe.ID})
 	}
-	wantedOrder := map[string][]int{}
+	s.Queue = slicez.Filter(s.Queue, func(mqe QueueSong) bool {
+		if _, ok := inKfQueue[mqe.ArtistSong()]; !ok {
+			if mqe.HasBeenQueued {
+				s.QueueVersion++
+				return false
+			}
+		}
+		return true
+	})
+	position := 0
 	for i, mqe := range s.Queue {
-		k := mqe.Artist + "\x00" + mqe.Song
-		if _, ok := queued[k]; !ok {
+		if mqe.MinSingers > len(mqe.Singers) {
+			continue
+		}
+		qpos, ok := inKfQueue[mqe.ArtistSong()]
+		if !ok {
+			if mqe.SongID == 0 {
+				panic(fmt.Errorf("Trying to queue %q - %q, but I don't know the song_id", mqe.Artist, mqe.Song))
+			}
 			payload := map[string]any{
 				"identifier": map[string]any{
 					"type": 1,
@@ -452,46 +525,141 @@ func (s *karaokeSession) reconcile(kfQueue []KarafunQueueEntry) (string, map[str
 			if mqe.Artist == "" && mqe.Song == "" {
 				payload["singer"] = fmt.Sprintf("sentinel-%d", mqe.MyQueueID)
 			}
-			return "remote.AddToQueueResponse", payload, true
+			return "remote.AddToQueueRequest", payload, true
 		}
-		wantedOrder[k] = append(wantedOrder[k], i)
-	}
-	for i := 0; genericz.Min(len(kfQueue), len(s.Queue)) > i; i++ {
-		log.Printf("queuecmp: %d: %s <> %s", i, s.Queue[i].Song, kfQueue[i].Song.Title)
-	}
-	if len(kfQueue) > len(s.Queue) {
-		for _, kfqe := range kfQueue[len(s.Queue):] {
-			log.Printf("queuecmp: n/a <> %s", kfqe.Song.Title)
-		}
-	}
-	if len(kfQueue) < len(s.Queue) {
-		for _, mqe := range s.Queue[len(kfQueue):] {
-			log.Printf("queuecmp: %s <> n/a", mqe.Song)
-		}
-	}
-	for i, kfqe := range kfQueue {
-		k := kfqe.Song.Artist + "\x00" + kfqe.Song.Title
-		kfIds, ok := wantedOrder[k]
-		if !ok {
-			// Song in the Karafun queue that we don't know.
-			return "remote.RemoveFromQueueRequest", map[string]any{
-				"queueItemId": fmt.Sprint(kfqe.ID),
-			}, true
-		}
-		if i != kfIds[0] {
+		s.Queue[i].HasBeenQueued = true
+		if qpos[0].Index != position {
 			return "remote.MoveInQueueRequest", map[string]any{
-				"queueItemId": fmt.Sprint(kfqe.ID),
-				"to":          kfIds[0],
+				"queueItemId": qpos[0].ID,
+				"from":        qpos[0].Index,
+				"to":          position,
 			}, true
 		}
-		if len(kfIds) == 1 {
-			delete(wantedOrder, k)
+		if len(qpos) == 1 {
+			delete(inKfQueue, mqe.ArtistSong())
 		} else {
-			wantedOrder[k] = kfIds[1:]
+			inKfQueue[mqe.ArtistSong()] = qpos[1:]
 		}
+		position++
 	}
+	for _, qpos := range inKfQueue {
+		return "remote.RemoveFromQueueRequest", map[string]any{
+			"queueItemId": qpos[0].ID,
+		}, true
+	}
+
 	s.cond.Broadcast()
 	return "", nil, false
+}
+
+type idAndIndex struct {
+	Index int
+	ID    any
+}
+
+func (s *karaokeSession) reorder() {
+	var singerRoundRobin []string
+	for _, qe := range s.Queue {
+		for _, name := range qe.Singers {
+			if !slices.Contains(singerRoundRobin, name) {
+				singerRoundRobin = append(singerRoundRobin, name)
+			}
+		}
+	}
+
+	happiness := make([]float64, len(singerRoundRobin))
+
+	rrIdx := 0
+	moved := make([]bool, len(s.Queue))
+	newQueue := make([]QueueSong, 0, len(s.Queue))
+	for len(newQueue) < len(s.Queue) {
+		lowestHappiness := genericz.Min(happiness...)
+		for happiness[rrIdx] > lowestHappiness {
+			rrIdx = (rrIdx + 1) % len(singerRoundRobin)
+		}
+		nextUp := singerRoundRobin[rrIdx]
+		foundSong := false
+		for i, qe := range s.Queue {
+			if !moved[i] && slices.Contains(qe.Singers, nextUp) {
+				newQueue = append(newQueue, qe)
+				moved[i] = true
+				for _, name := range qe.Singers {
+					happiness[slices.Index(singerRoundRobin, name)] += 1 / float64(len(qe.Singers))
+				}
+				foundSong = true
+				break
+			}
+		}
+		if !foundSong {
+			happiness[rrIdx] += 1000
+		}
+		rrIdx = (rrIdx + 1) % len(singerRoundRobin)
+	}
+	s.Queue = newQueue
+	s.determineMoveability()
+	spew.Dump(s.Queue)
+}
+
+func (s *karaokeSession) determineMoveability() {
+	for i, qe := range s.Queue {
+		s.Queue[i].CanMoveUp = false
+		s.Queue[i].CanMoveDown = false
+		for _, qe2 := range s.Queue[:i] {
+			if setEquals(qe.Singers, qe2.Singers) {
+				s.Queue[i].CanMoveUp = true
+				break
+			}
+		}
+		for _, qe2 := range s.Queue[i+1:] {
+			if setEquals(qe.Singers, qe2.Singers) {
+				s.Queue[i].CanMoveDown = true
+				break
+			}
+		}
+	}
+}
+
+func setEquals(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, x := range a {
+		found := false
+		for _, y := range b {
+			if x == y {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func pickNextSinger(happiness []float64) int {
+	var winner int
+	for i, s := range happiness {
+		if s < happiness[winner] {
+			winner = i
+		}
+	}
+	return winner
+}
+
+func (s *karaokeSession) persistToDisk() {
+	if *datadir == "" {
+		return
+	}
+	b, err := json.Marshal(s.Queue)
+	if err != nil {
+		log.Printf("Failed to persist queue to disk: %v", err)
+		return
+	}
+	if err := ioutil.WriteFile(filepath.Join(*datadir, s.channel+".json"), b, 0666); err != nil {
+		log.Printf("Failed to persist queue to disk: %v", err)
+		return
+	}
 }
 
 type Command struct {
@@ -502,9 +670,7 @@ type Command struct {
 	TrackID    int    `json:"track_id,omitempty"`
 	MyQueueID  int    `json:"my_queue_id,omitempty"`
 	Number     int    `json:"number,omitempty"`
-	Artist     string
-	Song       string
-	MinSingers int
+	MinSingers int    `json:"min_singers,omitempty"`
 }
 
 type Update struct {
@@ -514,13 +680,15 @@ type Update struct {
 }
 
 type QueueSong struct {
-	Artist     string   `json:"artist"`
-	Song       string   `json:"song"`
-	Singers    []string `json:"singers"`
-	MinSingers int      `json:"min_singers"`
-	SongID     int      `json:"song_id"`
-	KfQueueID  string   `json:"kf_queue_id"`
-	MyQueueID  int      `json:"my_queue_id"`
+	Artist        string   `json:"artist"`
+	Song          string   `json:"song"`
+	Singers       []string `json:"singers"`
+	MinSingers    int      `json:"min_singers"`
+	SongID        int      `json:"song_id"`
+	MyQueueID     int      `json:"my_queue_id"`
+	CanMoveUp     bool     `json:"can_move_up"`
+	CanMoveDown   bool     `json:"can_move_down"`
+	HasBeenQueued bool     `json:"has_been_queued"`
 }
 
 type Permissions struct {
@@ -582,7 +750,7 @@ type KarafunMessage struct {
 }
 
 type KarafunQueueEntry struct {
-	ID     string `json:"id"`
+	ID     any    `json:"id"`
 	Singer string `json:"singer"`
 	Song   struct {
 		ID struct {
@@ -593,4 +761,18 @@ type KarafunQueueEntry struct {
 		Artist     string        `json:"artist"`
 		SongTracks []interface{} `json:"songTracks"`
 	} `json:"song"`
+}
+
+func (qe *KarafunQueueEntry) ArtistSong() string {
+	if qe == nil {
+		return "\x00\x00\x00"
+	}
+	return qe.Song.Artist + "\x00" + qe.Song.Title
+}
+
+func (qe *QueueSong) ArtistSong() string {
+	if qe == nil {
+		return "\x00\x00\x00"
+	}
+	return qe.Artist + "\x00" + qe.Song
 }

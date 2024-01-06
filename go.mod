@@ -1,10 +1,11 @@
 module superqueue
 
-go 1.21.4
+go 1.20
 
 require (
 	github.com/Jille/contextcond v1.0.0
-	github.com/Jille/genericz v0.4.0
+	github.com/Jille/genericz v0.5.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/gorilla/websocket v1.5.1
 )
 

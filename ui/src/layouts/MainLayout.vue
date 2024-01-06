@@ -3,16 +3,16 @@
     <q-header elevated>
       <q-toolbar>
         <q-toolbar-title class="row justify-between items-center">
-					<template v-if="!searching">
-						<router-link class="text-white" :to="{name: 'list', params: {list: 'theme'}}">Karafun</router-link>
-						<q-space />
-						<q-btn icon="search" @click="searching = true" round flat />
-  				  <q-btn icon="person" round flat @click="askUsername=true" />
-					</template>
-					<template v-else>
-						<q-btn icon="chevron_left" @click="searching = false" round flat />
-						<q-input v-model="search" debounce="300" clearable color="white" dense autofocus class="col-grow" />
-					</template>
+          <template v-if="!searching">
+            <router-link class="text-white" :to="{name: 'list', params: {list: 'theme'}}">Karafun</router-link>
+            <q-space />
+            <q-btn icon="search" @click="searching = true" round flat />
+            <q-btn icon="person" round flat @click="askUsername=true" />
+          </template>
+          <template v-else>
+            <q-btn icon="chevron_left" @click="searching = false" round flat />
+            <q-input v-model="search" debounce="300" clearable color="white" dense autofocus class="col-grow" />
+          </template>
         </q-toolbar-title>
       </q-toolbar>
     </q-header>
@@ -20,6 +20,7 @@
     <q-footer elevated>
       <q-expansion-item
           expand-separator
+          v-model="showQueue"
           :label="queue.length == 0 ? 'Queue empty' : queue[0].song"
           :caption="queue.length == 0 ? '' : queue[0].artist"
           :icon="queue.length == 0 ? '' : 'music_note'"
@@ -30,7 +31,7 @@
             <q-card-section class="q-pa-none">
               <q-scroll-area style="height: 40vh;">
                 <q-list bordered separator>
-                  <q-item v-for="(q, idx) in queue.slice(1)" :key="q.my_queue_id">
+                  <q-item v-for="q in queue.slice(1)" :key="q.my_queue_id">
   <!--
                     <q-item-section avatar>
                       <q-avatar square>
@@ -42,20 +43,24 @@
                     <q-item-section>
                       <q-item-label class="text-primary">{{q.song}}</q-item-label>
                       <q-item-label caption>{{q.artist}}</q-item-label>
+                      <q-item-label class="text-dark">
+                        <template v-for="(s, idx) in q.singers" :key="idx"><template v-if="idx > 0">, </template>{{s}}</template>
+                        <template v-if="q.singers.length < q.min_singers">, but looking for {{q.min_singers - q.singers.length}} more singer<template v-if="q.min_singers - q.singers.length != 1">s</template></template>
+                      </q-item-label>
                     </q-item-section>
                     <q-item-section side>
                       <div class="q-gutter-sm" v-if="this.$q.screen.gt.sm">
                         <q-btn icon="delete" dense color="red" @click="remove(q.my_queue_id)" />
-                        <q-btn v-if="queue.length > 1" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="idx == queue.length - 2" />
-                        <q-btn v-if="queue.length > 1" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="idx == 0" />
+                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
+                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
                         <q-btn v-if="!q.singers.includes(this.username)" icon="thumb_up" dense color="green" @click="upvote(q.my_queue_id)" />
                       </div>
                       <div v-else class="q-gutter-xs">
                         <q-btn icon="delete" dense color="red" @click="remove(q.my_queue_id)" />
                         <q-btn v-if="!q.singers.includes(this.username)" icon="thumb_up" dense color="green" @click="upvote(q.my_queue_id)" />
                         <br />
-                        <q-btn v-if="queue.length > 1" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="idx == queue.length - 2" />
-                        <q-btn v-if="queue.length > 1" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="idx == 0" />
+                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_down" dense color="secondary" @click="moveDown(q.my_queue_id)" :disable="!q.can_move_down" />
+                        <q-btn v-if="q.singers.includes(username)" icon="keyboard_arrow_up" dense color="secondary" @click="moveUp(q.my_queue_id)" :disable="!q.can_move_up" />
                       </div>
                     </q-item-section>
                   </q-item>
@@ -91,7 +96,7 @@
     </q-inner-loading>
   </q-layout>
 
-  <q-dialog v-model="askUsername" persistent>
+  <q-dialog v-model="askUsername" :persistent="username == ''">
     <q-card class="q-pa-md">
       <q-card-section>
         <q-input v-model="username" label="Enter your name" @keyup.enter="setUsername" autofocus />
@@ -115,47 +120,55 @@ export default defineComponent({
       connected: false,
       username: '',
       askUsername: true,
-			searching: false,
-			search: '',
-			queue: [],
-			permissions: {
-			  addToQueue: false,
-			  managePlayback: false,
-			  manageQueue: false,
-			  manageVolumes: false,
-			  viewQueue: false,
-			},
-			status: {
-			  playing: false,
-			  loading: false,
-			  tempo: 0,
-			  pitch: 0,
-			  tracks: [] as {
-			    track_id: number,
-			    volume: number,
-			    caption: string,
-			    color: string,
-			  }[],
-			},
+      searching: false,
+      search: '',
+      queue: [],
+      showQueue: false,
+      permissions: {
+        addToQueue: false,
+        managePlayback: false,
+        manageQueue: false,
+        manageVolumes: false,
+        viewQueue: false,
+      },
+      status: {
+        playing: false,
+        loading: false,
+        tempo: 0,
+        pitch: 0,
+        tracks: [] as {
+          track_id: number,
+          volume: number,
+          caption: string,
+          color: string,
+        }[],
+      },
     }
   },
 
-	mounted() {
-	  const username = this.$q.localStorage.getItem('username') as string|null
+  mounted() {
+    const username = this.$q.localStorage.getItem('username') as string|null
     if(username) {
       this.username = username
       this.askUsername = false
     }
-	  this.connect()
-	},
+    this.connect()
+  },
 
   watch: {
-		search(str: string) {
-			if(!str) {
-				return;
-			}
-			this.$router.replace({name: 'search', params: { search: str }});
-		}
+    search(str: string) {
+      if(!str) {
+        return;
+      }
+      this.$router.replace({name: 'search', params: { search: str }});
+    },
+    '$route.path': {
+      handler() {
+        if(this.$q.screen.lt.sm) {
+          this.showQueue = false;
+        }
+      },
+    },
   },
 
   provide() {
