@@ -63,7 +63,7 @@ export default defineComponent({
       websocket: inject('websocket') as null|WebSocket,
       queueDialog: false,
       singerName: '',
-      minSingers: 1,
+      minSingers: 2,
     };
   },
   inject: [
