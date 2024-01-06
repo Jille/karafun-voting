@@ -507,9 +507,6 @@ func (s *karaokeSession) reconcile(kfQueue []KarafunQueueEntry) (string, map[str
 	})
 	position := 0
 	for i, mqe := range s.Queue {
-		if mqe.MinSingers > len(mqe.Singers) {
-			continue
-		}
 		qpos, ok := inKfQueue[mqe.ArtistSong()]
 		if !ok {
 			if mqe.SongID == 0 {
@@ -524,8 +521,13 @@ func (s *karaokeSession) reconcile(kfQueue []KarafunQueueEntry) (string, map[str
 			}
 			if mqe.Artist == "" && mqe.Song == "" {
 				payload["singer"] = fmt.Sprintf("sentinel-%d", mqe.MyQueueID)
+			} else if mqe.MinSingers > len(mqe.Singers) {
+				continue
 			}
 			return "remote.AddToQueueRequest", payload, true
+		}
+		if mqe.MinSingers > len(mqe.Singers) {
+			continue
 		}
 		s.Queue[i].HasBeenQueued = true
 		if qpos[0].Index != position {
