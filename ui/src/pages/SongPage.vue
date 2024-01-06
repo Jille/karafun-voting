@@ -4,8 +4,8 @@
     <img :src="song.img" />
     <div class="text-h5">{{song.artist.name}} - {{song.name}}</div>
     <div>
-      <q-chip color="secondary" icon="calendar_month">{{song.year}}</q-chip>
-      <q-chip color="secondary" icon="timer">{{duration}}</q-chip>
+      <q-chip color="secondary" icon="calendar_month" :ripple="false">{{song.year}}</q-chip>
+      <q-chip color="secondary" icon="timer" :ripple="false">{{duration}}</q-chip>
     </div>
     <div class="row items-center justify-evenly">
       <q-chip v-for="st in song.styles" :key="st.id" dense clickable @click="$router.push({name: 'songs', params: {filter: 'st_' + st.id}})">
