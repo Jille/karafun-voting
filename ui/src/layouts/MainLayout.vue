@@ -25,6 +25,7 @@
           :caption="queue.length == 0 ? '' : queue[0].artist"
           :icon="queue.length == 0 ? '' : 'music_note'"
           expand-icon="keyboard_arrow_up"
+          expand-icon-class="text-white"
           v-if="queue.length > 0 || permissions.managePlayback"
         >
           <q-card>
@@ -219,11 +220,18 @@ export default defineComponent({
       this.connection && this.connection.send(JSON.stringify(cmd))
     },
     remove(id: number) {
-      const cmd = {
-        command: 'remove',
-        my_queue_id: id,
-      }
-      this.connection && this.connection.send(JSON.stringify(cmd))
+      this.$q.dialog({
+        title: 'Remove from queue',
+        message: 'Would you like to remove this song from the queue?',
+        cancel: true,
+        persistent: false
+      }).onOk(() => {
+        const cmd = {
+          command: 'remove',
+          my_queue_id: id,
+        }
+        this.connection && this.connection.send(JSON.stringify(cmd))
+      });
     },
     moveUp(id: number) {
       const cmd = {
