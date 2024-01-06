@@ -605,14 +605,17 @@ func (s *karaokeSession) reorder() {
 			if !moved[i] && slices.Contains(qe.Singers, nextUp) {
 				newQueue = append(newQueue, qe)
 				moved[i] = true
-				for _, name := range qe.Singers {
-					happiness[slices.Index(singerRoundRobin, name)] += 1 / float64(len(qe.Singers))
+				if qe.MinSingers <= len(qe.Singers) {
+					for _, name := range qe.Singers {
+						happiness[slices.Index(singerRoundRobin, name)] += 1 / float64(len(qe.Singers))
+					}
 				}
 				foundSong = true
 				break
 			}
 		}
 		if !foundSong {
+			// This singer doesn't have any songs left in the queue.
 			happiness[rrIdx] += 1000
 		}
 		rrIdx = (rrIdx + 1) % len(singerRoundRobin)
