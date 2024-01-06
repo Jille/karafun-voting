@@ -1,5 +1,5 @@
 <template>
-  <q-page class="row items-center justify-evenly">
+  <q-page class="row items-top justify-evenly">
     <SongsList :filter="'sc_' + search" />
   </q-page>
 </template>
