@@ -32,7 +32,7 @@ export default defineComponent({
 	methods: {
 		async loadMore() {
 			this.loading = true;
-			const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '?type=song_list&filter='+ this.filter + '&offset='+this.songs.length);
+			const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '/?type=song_list&filter='+ this.filter + '&offset='+this.songs.length);
 			this.songs.push(...resp.data.songs);
 			this.total = resp.data.total;
 			this.loading = false;
@@ -41,7 +41,7 @@ export default defineComponent({
 	watch: {
 		filter: {
 			async handler(f: string) {
-				const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '?type=song_list&filter='+ f + '&offset=0');
+				const resp = await this.$axios.get('https://www.karafun.co.uk/'+ this.$route.params.channel + '/?type=song_list&filter='+ f + '&offset=0');
 				this.songs = resp.data.songs;
 				this.total = resp.data.total;
 			},

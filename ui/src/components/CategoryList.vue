@@ -27,7 +27,7 @@ export default defineComponent({
 	watch: {
 		list: {
 			async handler(list: string) {
-				const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '?type='+ list);
+				const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '/?type='+ list);
 				if(resp.request.responseURL.match(/remote-error/)) {
 					return;
 				}

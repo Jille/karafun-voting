@@ -83,7 +83,7 @@ export default defineComponent({
     id: {
       async handler(id: string) {
         this.loading = true;
-        const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '?type=song_info&id='+ id);
+        const resp = await this.$axios.get('https://www.karafun.co.uk/' + this.$route.params.channel + '/?type=song_info&id='+ id);
         this.song = resp.data;
         this.loading = false;
       },
